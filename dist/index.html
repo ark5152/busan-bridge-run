@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#19131e">
+<title>부산 브릿지 런</title>
+<style>
+  @font-face {
+    font-family: "NeoDunggeunmo";
+    src: url("assets/fonts/neodgm.woff2") format("woff2");
+    font-display: swap;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #19131e; color: #fff6ee; font-family: "NeoDunggeunmo", "Malgun Gothic", sans-serif;
+    overscroll-behavior: none; user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  #wrap {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  #stage {
+    position: relative; display: grid; place-items: center;
+    width: 100%; height: 100%; min-width: 0; min-height: 0;
+  }
+  canvas {
+    display: block; touch-action: none;
+  }
+  #runnerForm {
+    position: absolute; z-index: 2; left: 50%; top: 50%;
+    width: var(--game-width); height: var(--game-height);
+    transform: translate(-50%, -50%); pointer-events: none;
+  }
+  #runnerName, #crewName, #runnerForm button {
+    position: absolute; pointer-events: auto; height: 7.6%; top: 77.4%;
+    border: 0; border-radius: 999px; background: transparent; color: #172c65;
+  }
+  #runnerName, #crewName {
+    left: 32.2%; width: 27.5%; min-width: 0; padding: 0 .35em;
+    font: clamp(12px,calc(var(--game-height) * .030),30px) "NeoDunggeunmo","Malgun Gothic",sans-serif;
+    user-select: text;
+  }
+  #runnerName::placeholder { color: #4a5975; opacity: 1; }
+  #runnerForm button { left: 61.3%; width: 12.7%; cursor: pointer; }
+  #runnerForm button:hover { background: #fff3; }
+  #runnerForm button:focus-visible, #runnerName:focus-visible {
+    outline: 2px solid #123cf3; outline-offset: 2px;
+  }
+  #pauseButton, #motionButton {
+    position: absolute; z-index: 3;
+    right: calc(50% - var(--game-width) / 2 + 8px);
+    bottom: calc(50% - var(--game-height) / 2 + 8px);
+    border: 1px solid #afe8ff; border-radius: 8px; min-height: 32px; padding: 4px 10px;
+    background: #163570; color: #fff; font: 13px "NeoDunggeunmo","Malgun Gothic",sans-serif; cursor: pointer;
+  }
+  #motionButton {
+    right: auto;
+    left: calc(50% - var(--game-width) / 2 + 8px);
+  }
+  #mobileControls { display: none; }
+  #launchGuide {
+    position: fixed; inset: 0; z-index: 6; display: grid; place-items: center;
+    padding: 24px; background: rgba(10,21,38,.90); touch-action: manipulation;
+  }
+  #launchGuide[hidden] { display: none; }
+  #launchGuide div { max-width: 420px; text-align: center; }
+  #launchStatus { margin: 0 0 8px; color: #fff6ee; font-size: clamp(22px, 6vw, 38px); }
+  #launchHint { color: #bfdbf4; font-size: 15px; margin: 0 0 16px; }
+  #cancelLaunch {
+    min-height: 44px; padding: 0 18px; border: 1px solid #8db4df;
+    border-radius: 8px; color: #fff6ee; background: #163570; font: inherit;
+  }
+  @media (any-pointer: coarse) {
+    #wrap { bottom: auto; height: 100dvh; }
+    #runnerName, #crewName { min-height: 24px; font-size: 16px; transform: translateY(-50%); top: 81.5%; }
+    #runnerForm button::after { content: ""; position: absolute; inset: -12px 0; }
+    #pauseButton { min-height: 40px; padding: 3px 8px; }
+  }
+  .btn {
+    width: clamp(104px, 36vw, 168px); height: 68px;
+    border: 2px solid #3a1a1b; border-radius: 15px;
+    box-shadow: 0 5px 0 #120b11;
+    font: 19px "NeoDunggeunmo","Malgun Gothic",sans-serif; color: #3a1a1b;
+    display: grid; place-content: center; gap: 3px;
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  .btn small { font-size: 11px; font-weight: normal; }
+  .btn:active, .btn.held { transform: translateY(4px); box-shadow: 0 1px 0 #120b11; }
+  #bJump { background: #fff6ee; }
+  #bBoost { background: #fcbdbb; }
+  @media (any-pointer: coarse) {
+    #mobileControls {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 16px; z-index: 1;
+      visibility: hidden; pointer-events: none;
+    }
+    #mobileControls.show { visibility: visible; pointer-events: auto; }
+  }
+  @media (any-pointer: coarse) and (orientation: portrait) {
+    #wrap { grid-template-rows: 1.35fr auto auto 1fr; }
+    #stage { grid-row: 2; height: auto; width: min(100%, 640px, 120dvh); aspect-ratio: 16 / 9; }
+    #mobileControls {
+      grid-row: 3; width: min(100%, 480px); min-height: 126px; align-items: start;
+      padding: 24px 18px 32px;
+    }
+  }
+  @media (any-pointer: coarse) and (orientation: landscape) {
+    #wrap { grid-template-rows: minmax(0, 1fr) 62px; }
+    #mobileControls { width: min(100%, 720px); padding: 0 14px 9px; }
+    .btn { height: 46px; font-size: 16px; }
+    .btn small { font-size: 10px; }
+  }
+#runnerName,#crewName { width: 14.5%; height: 5%; top: 79%; font-size: clamp(10px,calc(var(--game-height) * .023),24px); border-radius: 0; }
+#runnerName { left: 30.8%; }
+#crewName { left: 45.3%; border-left: 1px solid #899bb0; padding-left: .55em; }
+#crewName::placeholder { color: #4a5975; }
+#motionButton,#rankButton {
+  position: absolute; z-index: 3; left: calc(50% - var(--game-width) / 2 + 8px);
+  bottom: calc(50% - var(--game-height) / 2 + 8px); padding: 3px 6px; min-height: 0;
+  border: 1px solid #afe8ff; border-radius: 5px; background: #163570; color: white;
+  font: clamp(9px,calc(var(--game-height) * .018),14px) "NeoDunggeunmo",sans-serif; cursor: pointer;
+}
+#rankButton { left: auto; right: calc(50% - var(--game-width) / 2 + 8px); bottom: calc(50% - var(--game-height) / 2 + 8px); }
+#ranking { width: min(480px,92vw); max-height: 85vh; overflow: auto; border: 2px solid #afe8ff; border-radius: 10px; padding: 18px; color: #fff6ee; background: #122b55; }
+#ranking::backdrop { background: #09172ab8; }
+#ranking h2 { margin-top: 0; }
+#ranking table { width: 100%; border-collapse: collapse; text-align: left; }
+#ranking th,#ranking td { padding: 8px 4px; border-bottom: 1px solid #536887; overflow-wrap: anywhere; }
+#ranking td:last-child { white-space: nowrap; }
+#ranking form { margin-top: 14px; text-align: right; }
+#ranking button { font: inherit; padding: 5px 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<main id="wrap">
+  <div id="stage">
+    <canvas id="screen" aria-label="부산 브릿지 런 게임 화면"></canvas>
+    <form id="runnerForm">
+      <input id="runnerName" aria-label="러너 이름" placeholder="러너 이름" maxlength="14" autocomplete="off" enterkeyhint="go">
+      <input id="crewName" aria-label="크루 이름 (선택)" placeholder="크루 이름 (선택)" maxlength="18" autocomplete="off">
+      <button type="submit" aria-label="출발!"></button>
+    </form>
+    <button type="button" id="motionButton" aria-pressed="true">화면 움직임 줄이기 · 켜짐</button>
+    <button type="button" id="rankButton">랭킹</button>
+    <dialog id="ranking" aria-labelledby="rankTitle">
+      <h2 id="rankTitle">풀코스 랭킹</h2>
+      <p id="rankEmpty">아직 완주 기록이 없어요.</p>
+      <table id="rankTable" hidden>
+        <thead><tr><th>순위</th><th>크루</th><th>러너</th><th>기록</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <form method="dialog"><button>닫기</button></form>
+    </dialog>
+    <button type="button" id="pauseButton" aria-pressed="false" hidden>일시정지</button>
+  </div>
+  <div id="mobileControls" aria-label="터치 조작">
+    <button type="button" class="btn" id="bJump">점프<small>한 번 점프 · 두 번 2단 점프</small></button>
+    <button type="button" class="btn" id="bBoost">가속<small>길게 누르기</small></button>
+  </div>
+  <section id="launchGuide" hidden aria-label="가로 화면 안내">
+    <div>
+      <p id="launchStatus" role="status"></p>
+      <p id="launchHint"></p>
+      <button id="cancelLaunch" type="button">시작 취소</button>
+    </div>
+  </section>
+</main>
+<script src="src/course.js"></script>
+<script src="src/game.js"></script>
+</body>
+</html>
+
